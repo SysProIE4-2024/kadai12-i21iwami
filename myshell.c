@@ -77,6 +77,16 @@ void redirect(int fd, char *path, int flag) {   // リダイレクト処理を�
   //        入力の場合 O_RDONLY
   //        出力の場合 O_WRONLY|O_TRUNC|O_CREAT
   //
+  if (fd == 1) {
+    close(1);
+    fd = open(path, flag, 0644);
+  } else if (fd == 0) {
+    close(0);
+    fd = open(path, flag);
+  } else {
+    fprintf(stderr, "something is wrong\n");
+    exit(1);
+  }
 }
 
 void externalCom(char *args[]) {                // 外部コマンドを実行する
@@ -85,7 +95,13 @@ void externalCom(char *args[]) {                // 外部コマンドを実行�
     perror("fork");                             //     fork 失敗
     exit(1);                                    //     非常事態，親を終了
   }
-  if (pid==0) {                                 //   子プロセスなら
+  if (pid==0) {
+    if (ifile != NULL) {
+      redirect(0, ifile, O_RDONLY);
+    }
+    if (ofile != NULL) {
+      redirect(1, ofile, O_WRONLY|O_TRUNC|O_CREAT);
+    }                            //   子プロセスなら
     execvp(args[0], args);                      //     コマンドを実行
     perror(args[0]);
     exit(1);
@@ -129,4 +145,56 @@ int main() {
   }
   return 0;
 }
+
+/*
+% make
+cc -D_GNU_SOURCE -Wall -std=c99 -o myshell myshell.c
+% ./myshell
+Command: printenv LC_TIME
+Command: setenv LC_TIME C
+Command: printenv LC_TIME
+C
+Command: setenv LC_TIME ja_JP
+Command: :
+:: No such file or directory
+Command: printenv LC_TIME
+ja_JP
+Command: ls
+Makefile	README.md	README.pdf	myshell		myshell.c
+Command: cat a.txt
+cat: a.txt: No such file or directory
+Command: echo aaa bbb > a.txt
+Command: cat a.txt
+aaa bbb
+Command: 
+Command: ls > a.txt
+Command: cat a.txt
+Makefile
+README.md
+README.pdf
+a.txt
+myshell
+myshell.c
+Command: echo ccc > b.txt c.txt
+Command: ls
+Makefile	README.pdf	b.txt		myshell.c
+README.md	a.txt		myshell
+Command: cat b.txt
+ccc c.txt
+Command: ls > a.txt
+Command: cat a.txt
+Makefile
+README.md
+README.pdf
+a.txt
+b.txt
+myshell
+myshell.c
+Command: grep txt < a.txt
+a.txt
+b.txt
+Command: grep < a.txt txt
+a.txt
+b.txt
+*/
 
